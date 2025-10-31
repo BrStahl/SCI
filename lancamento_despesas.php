@@ -444,14 +444,11 @@ else {
 		</style>
 
 		<script type="text/javascript">
-			function completa_nome(elmnt) {
-				//alert();
+			function completa_nome(elmnt, id) {
 				$(elmnt).autocomplete("completar_funcionario.php", {
 					width: 200,
 					selectFirst: true,
 					reverter: false
-					valor = document.getElementById('funcionario'+ id).value
-					console.log(valor)
 				});
 			}
 		</script>
@@ -501,6 +498,17 @@ else {
 		</script>
 
 <script type="text/javascript">
+    function atualizar_total() {
+        var total = 0;
+        $('input[name^="valor"]:not([name*="_abatido"])').each(function() {
+            var valor = $(this).val().replace('.', '').replace(',', '.');
+            if (valor !== '' && !isNaN(valor)) {
+                total += parseFloat(valor);
+            }
+        });
+        $('#total_lancamento').text('R$ ' + total.toLocaleString('pt-BR', { minimumFractionDigits: 2 }));
+    }
+
     // FORMATAÇÃO (insere ":" antes dos últimos 2 dígitos)
     function mascara_hora1(elmnt, id, tipo_despesa_id) {
         // Remove tudo que não for número
@@ -716,7 +724,7 @@ else {
 					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $descricao_area . "</center></b></td>
 					 <td bgcolor='#FFFFFF'><center>
 						<input name='funcionario$id' type='text' id='funcionario$id' value='$funcionario' size='40'
-						onfocus='javascript:completa_nome(this)'/></td>
+						onfocus='javascript:completa_nome(this, $id)'/></td>
 					 <td bgcolor='#FFFFFF'><center><input name='horas$id' type='text' id='horas$id' value='$horas' size='2' maxlength='6'
 					 onblur='javascript:mascara_hora1(this, $id, $tipo_referencia_id)' /></td>
 					 <td bgcolor='#FFFFFF'><center>
@@ -730,9 +738,9 @@ else {
 					 <td bgcolor='#FFFFFF'><center>
 						<input name='observacao$id' type='text' id='observacao$id' value='$observacao' size='35' maxlength='200' /></td>
 					 <td bgcolor='#FFFFFF'><center><input name='valor$id' type='text' id='valor$id' value='$valor' size='7'
-					 onKeyPress='valida_dinheiro(this)'/></td>
+					 onKeyPress='valida_dinheiro(this)' onchange='atualizar_total()'/></td>
 					 <td bgcolor='#FFFFFF'><center><input name='valor_abatido$id' type='text' id='valor_abatido$id' value='$valor_abatido' size='7'
-					 onKeyPress='valida_dinheiro(this)'/></td>
+					 onKeyPress='valida_dinheiro(this)' onchange='atualizar_total()'/></td>
 					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $prazo . "</center></b></td>
 					 <td bgcolor='#FFFFFF'><a href=javascript:pagina('upload_despesa.php?id=$id&acidente_id=$acidente_id','1200','400','Anexos')>
 						<div align='center'><img src='../SCA/images/anexo.png' width='15' heigth='10' style='border:none'/></div></a></td>
@@ -931,7 +939,7 @@ else {
 						</td>
 						<td bgcolor="#FFFFFF">
 							<div align="right">
-								<font size="-1"><b>R$ <?php print number_format($total_lancamento, 2, ',', '.'); ?></b></font>
+								<font size="-1"><b id="total_lancamento">R$ <?php print number_format($total_lancamento, 2, ',', '.'); ?></b></font>
 							</div>
 						</td>
 					</tr>
