@@ -1,0 +1,9 @@
+{
+    "type": "ftp",
+    "host": "192.168.10.148",
+    "username": "control",
+    "password": "5ft5c4covr",
+    "port": 21,
+    "remotePath": "/var/www/html/registro_acidentes",
+    "uploadOnSave": true
+}

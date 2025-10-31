@@ -1,0 +1,971 @@
+<?php
+session_name("covre_ti");
+session_start();
+
+require("../SCA/includes/page_func.php");
+include("../SCA/includes/conect_sqlserver.php");
+
+$localItem = "../registro_acidentes/lancamento_despesas.php";
+$logado    = $_SESSION["usuario_logado"];
+//$acesso  = valida_acesso($conSQL, $localItem, $logado);
+$acesso = "permitido";
+
+if ($acesso <> "permitido") {
+	grava_acesso($conSQL, $localItem, $logado, 2, $vObservacao);
+
+	print "
+        <script language = 'JavaScript'>
+           alert('Acesso negado para esta p�gina');
+           window.location='centro.php';
+		</script>
+    ";
+} //elseif
+else {
+	grava_acesso($conSQL, $localItem, $logado, 1, $vObservacao);
+
+	$area_id 						= $_GET["area_id"];
+	$acidente_id 					= $_GET["acidente_id"];
+	$botao_voltar 					= $_GET["voltar"];
+
+	$status_despesa_id_pesquisa 	= $_POST["status_despesa_id_pesquisa"];
+
+
+	$query = "select pa.area_rh, pa.area_qualidade, usuario.id
+			  from usuario with (nolock)
+			  join permissoes_acidente pa with (nolock) on
+				  pa.usuario_id = usuario.id
+			  where usuario = '$logado'";
+	//print $query;
+	$result = odbc_exec($conSQL, $query);
+	$area_rh 			= odbc_result($result, 1);
+	$area_qualidade		= odbc_result($result, 2);
+	$usuario_id			= odbc_result($result, 3);
+
+
+	//verifica se o usuario tem mais de 1 area vinculada
+	if ($botao_voltar == 1) {
+		$query = "select id
+				  from area_responsavel_acidente ara with (nolock)
+				  where ((ara.responsavel_id = $usuario_id) or (ara.sub_1_id = $usuario_id) or (ara.sub_2_id = $usuario_id)) 
+					";
+		//print $query;
+		$result = odbc_exec($conSQL, $query);
+
+		$contador = 1;
+		while (odbc_fetch_row($result)) {
+			$area_responsavel_id 	= odbc_result($result, 1);
+
+			if ($contador == 1)
+				$area_id = $area_responsavel_id;
+			else
+				$area_id .= "," . $area_responsavel_id;
+
+			$contador++;
+		}
+	}
+
+
+	//verifica se o logado � responsavel pela area
+	$query = "select id
+			  from area_responsavel_acidente ara with (nolock)
+			  where ((ara.responsavel_id = $usuario_id) or (ara.sub_1_id = $usuario_id) or (ara.sub_2_id = $usuario_id)) 
+				";
+	//print $query;
+	$result = odbc_exec($conSQL, $query);
+
+	$permissao_campo = 'N';
+	while (odbc_fetch_row($result)) {
+		$area_responsavel_id 	= odbc_result($result, 1);
+
+		$posicao_area = strpos($area_id, $area_responsavel_id);
+
+		if (($area_id == $area_responsavel_id) || ($posicao_area != ''))
+			$permissao_campo = 'S';
+	}
+
+
+	$query = "select id, descricao
+			  from status_despesa_acidente";
+	$result = odbc_exec($conSQL, $query);
+	$lista_status = '';
+	while (odbc_fetch_row($result)) {
+		$status_id	= odbc_result($result, 1);
+		$status		= odbc_result($result, 2);
+
+		$lista_status .= "<option value='$status_id'>$status</option>";
+	} //while 
+	$lista_status_despesa = $lista_status;
+
+
+	//busca o status do registro de acidente
+	$query = "select status_id, classificacao
+			  from registro_acidente
+			  where acidente_id = $acidente_id";
+	//print $query;
+	$result = odbc_exec($conSQL, $query);
+	$status_acidente 	 = odbc_result($result, 1);
+	$opcao_classificacao = odbc_result($result, 2);
+
+	if ($opcao_classificacao == 'o')
+		$tipos_acidentes = 26;
+	else {
+		//SELECIONA OS TIPOS DE DESPESAS
+		$query = "select 
+					case acidente_int_ext
+						when 'i' then 7
+						when 'e' then 8
+						when 't' then 9
+						else 0
+					end,
+					case classificacao
+						when 'a' then 5
+						when 'i' then 6
+						else 0
+					end,
+					case when patrimonio_covre = 's'
+							then 11
+							else 0
+					end,	
+					case when patrimonio_cliente = 's'
+							then 10
+							else 0
+					end,
+					case when patrimonio_terceiro = 's'
+							then 12
+							else 0
+					end,
+					isnull((select top 1 13
+							 from FERIDOS_ACIDENTE
+							 where acidente_id = $acidente_id
+							 and status_id = 'a'),0)		
+					from registro_acidente
+					where acidente_id = $acidente_id";
+		//print $query;
+		$result = odbc_exec($conSQL, $query);
+		$tipos_acidentes = odbc_result($result, 1) . "," . odbc_result($result, 2) . "," . odbc_result($result, 3) . "," . odbc_result($result, 4) . "," . odbc_result($result, 5) . "," . odbc_result($result, 6);
+	}
+
+	//verifica se houve novo tipo de acidente (se houve, o sistema ir� inserir automaticamente os tipos de despesas nas areas
+	$query = "select distinct tipo_despesa_acidente.id tipo_despesa_id, DATEADD(dd, prazo, getdate()) prazo, area_responsavel_id
+				from tipo_despesa_acidente with (nolock)
+				join acidente_tipo_despesas atd with (nolock) on
+					atd.tipo_despesa_id = tipo_despesa_acidente.id
+					and atd.tipo_acidente_id in ($tipos_acidentes)
+					and atd.tipo_despesa_id not in (select tipo_despesa_id
+													 from lancamento_despesas_acidente
+													 where acidente_id = $acidente_id
+													 and AREA_ID in (0,$area_id)
+													 and status_id = 'a')
+				join despesa_area_acidente daa with (nolock) on
+					daa.area_id = tipo_despesa_acidente.area_responsavel_id
+					and daa.status_id = 'a'
+					and daa.acidente_id = $acidente_id
+				where tipo_despesa_acidente.status_id = 'a'
+				and area_responsavel_id  in (0,$area_id)";
+	//print $query;
+	$result = odbc_exec($conSQL, $query);
+
+	while (odbc_fetch_row($result)) {
+		$tipo_despesa_id 	= odbc_result($result, 1);
+		$prazo				= odbc_result($result, 2);
+		$id_area			= odbc_result($result, 3);
+
+		//inserindo na table lancamento_despesas_acidente
+		$query = "insert into lancamento_despesas_acidente (acidente_id, tipo_despesa_id, status_despesa_id, prazo, data_inclusao, 
+				  area_id, status_id) values ($acidente_id, $tipo_despesa_id, 2, '$prazo', getdate(), $id_area, 'a')";
+		//print $query;
+		odbc_exec($conSQL, $query) or die('erro ao inserir');
+	}
+
+
+
+	if ($fechar != "") {
+		print "
+		<script language='javascript'>
+			open(location, '_self').close();
+		</script>
+	";
+	}
+
+
+	if ($gravar != "") {
+		if ($status_despesa_id_pesquisa != '')
+			$condicao_status = "and lda.status_despesa_id = '$status_despesa_id_pesquisa'";
+		else
+			$condicao_status = '';
+
+
+		if ($area_rh == 'S') {
+			$query = "select lda.lancamento_id, tda.tipo_despesa, lda.funcionario, lda.horas, lda.status_despesa_id, lda.data_despesa, 
+					lda.observacao, lda.valor, CONVERT(varchar(10), lda.prazo, 103), 
+					CONVERT(varchar(10), lda.data_inclusao, 103)+' - '+CONVERT(varchar(10), lda.data_inclusao, 108),
+					CONVERT(varchar(10), lda.data_despesa, 103) data_despesa_formatada, sda.descricao, area.area
+					from lancamento_despesas_acidente lda with (nolock)
+					join tipo_despesa_acidente tda with (nolock) on
+						tda.id = lda.tipo_despesa_id
+						and tda.referencia_despesa_id = 3
+					join status_despesa_acidente sda with (nolock) on
+						sda.id = lda.status_despesa_id
+					join area_responsavel_acidente area with (nolock) on
+						area.id = lda.area_id						
+					where lda.acidente_id = $acidente_id
+					and lda.status_id <> 'i'
+					$condicao_status
+					
+					union
+					
+					select lda.lancamento_id, tda.tipo_despesa, lda.funcionario, lda.horas, lda.status_despesa_id, lda.data_despesa, 
+					lda.observacao, lda.valor, CONVERT(varchar(10), lda.prazo, 103), 
+					CONVERT(varchar(10), lda.data_inclusao, 103)+' - '+CONVERT(varchar(10), lda.data_inclusao, 108),
+					CONVERT(varchar(10), lda.data_despesa, 103) data_despesa_formatada, null, area.area
+					from lancamento_despesas_acidente lda with (nolock)
+					join tipo_despesa_acidente tda with (nolock) on
+						tda.id = lda.tipo_despesa_id
+						and tda.referencia_despesa_id not in (3)
+					join area_responsavel_acidente area with (nolock) on
+						area.id = lda.area_id
+					join referencia_despesa rd with (nolock) on
+						rd.id = tda.referencia_despesa_id							
+					where lda.area_id = '$area_id'
+					and lda.status_id <> 'i'
+					$condicao_status
+					and lda.acidente_id = $acidente_id
+					
+					order by area.area, tda.tipo_despesa, lda.lancamento_id							";
+			//print $query;
+		} else {
+			$query = "select lda.lancamento_id, tda.tipo_despesa, lda.funcionario, lda.horas, lda.status_despesa_id, lda.data_despesa, 					lda.observacao, lda.valor, CONVERT(varchar(10), lda.prazo, 103), 
+					CONVERT(varchar(10), lda.data_inclusao, 103)+' - '+CONVERT(varchar(10), lda.data_inclusao, 108),
+					CONVERT(varchar(10), lda.data_despesa, 103) data_despesa_formatada, sda.descricao, tda.referencia_despesa_id
+					from lancamento_despesas_acidente lda with (nolock)
+					join tipo_despesa_acidente tda with (nolock) on
+						tda.id = lda.tipo_despesa_id
+					join status_despesa_acidente sda with (nolock) on
+						sda.id = lda.status_despesa_id
+					where lda.area_id in ($area_id)
+					and lda.acidente_id = $acidente_id
+					and lda.status_id <> 'i'
+					$condicao_status
+					order by tda.tipo_despesa, lda.lancamento_id";
+			//print $query;
+		}
+		$result = odbc_exec($conSQL, $query) or die('Erro');
+
+		$cont = 1;
+
+		while (odbc_fetch_row($result)) {
+			$id 						= odbc_result($result, 1);
+			$tipo_despesa_p			= odbc_result($result, 2);
+			$funcionario_p			= odbc_result($result, 3);
+			$horas_p		 			= odbc_result($result, 4);
+			$status_despesa_id_p		= odbc_result($result, 5);
+			$data_despesa_p			= odbc_result($result, 6);
+			$observacao_p			= odbc_result($result, 7);
+			$valor_p					= odbc_result($result, 8);
+			$data_despesa_formatada	= odbc_result($result, 11);
+			$descricao_status_p		= odbc_result($result, 12);
+			$referencia_despesa_id  	= odbc_result($result, 13);
+
+
+			$funcionario			= $_POST["funcionario$id"];
+			$horas		 		= $_POST["horas$id"];
+			$status_despesa_id	= $_POST["status_despesa_id$id"];
+			$data_despesa		= $_POST["data_despesa$id"];
+			$observacao			= $_POST["observacao$id"];
+			$valor				= $_POST["valor$id"];
+			$valor_abatido				= $_POST["valor_abatido$id"];
+
+
+			if ((($funcionario == '') || ($horas == '')) && ($referencia_despesa_id == 3))
+				$valor = '';
+
+			$nova_data_despesa =
+				implode(
+					preg_match("~\/~", $data_despesa) == 0 ? "/" : "-",
+					array_reverse(explode(preg_match("~\/~", $data_despesa) == 0 ? "-" : "/", $data_despesa))
+				);
+
+			$valor = str_replace('.', '', $valor);
+			$valor = str_replace(',', '.', $valor);
+			$valor = ltrim($valor);
+			$valor = rtrim($valor);
+
+			$valor_abatido = str_replace('.', '', $valor_abatido);
+			$valor_abatido = str_replace(',', '.', $valor_abatido);
+			$valor_abatido = ltrim($valor_abatido);
+			$valor_abatido = rtrim($valor_abatido);
+
+
+			if (($status_despesa_id == 1) && ($data_despesa == '')) {
+				print "<script type='text/javascript'>alert(unescape('Favor informar a data do cr&eacute;dito na linha $cont'));</script>";
+				$nao_atualiza = $id;
+			} else
+		   	if (($status_despesa_id == 1) && ($observacao == '')) {
+				print "<script type='text/javascript'>alert(unescape('Favor informar a observa%E7%E3o na linha $cont'));</script>";
+				$atualizar = $id;
+			} else {
+				$observacao = utf8_decode($observacao);
+
+				//atualiza o lancamento
+				$query1 = "UPDATE lancamento_despesas_acidente
+						  set funcionario = case when '$funcionario' = '' then null else '$funcionario' end,
+						  horas = case when '$horas' = '' then null else '$horas' end,
+						  status_despesa_id = $status_despesa_id,
+						  data_despesa = case when '$nova_data_despesa' = '' then null else '$nova_data_despesa' end,
+						  observacao = case when '$observacao' = '' then null else '$observacao' end,
+						  valor = case when '$valor' = '' then null else '$valor' end,
+						  valor_abatido = case when '$valor_abatido' = '' then null else '$valor_abatido' end,
+						  lancamento_alterado = case when '$valor' = '' then null else 's' end
+						  Where lancamento_id = '$id'";
+				//print $query;
+				odbc_exec($conSQL, $query1);
+
+
+				//SELECIONA A AREA DO LANCAMENTO
+				$query1 = "select AREA_ID
+						  from LANCAMENTO_DESPESAS_ACIDENTE
+						  Where lancamento_id = '$id'";
+				//print $query1;
+				$result1 = odbc_exec($conSQL, $query1);
+				$area_lancamento = odbc_result($result1, 1);
+
+
+				if ($funcionario_p != $funcionario) {
+					//alteracao campo funcionario
+					$query1 = "insert into log_alteracao_acidente (acidente_id, data_alteracao, usuario_id, valor_antigo, 
+								valor_novo, campo, tela_alteracao)
+							   values ($acidente_id, getdate(), (select id from usuario where usuario = '$logado'), 
+							   '$funcionario_p', '$funcionario', 'Funcion&aacute;rio ($tipo_despesa_p)', '4-$area_lancamento')";
+					//print $query1;
+					odbc_exec($conSQL, $query1);
+				}
+
+				if ($horas_p != $horas) {
+					//alteracao campo horas
+					$query1 = "insert into log_alteracao_acidente (acidente_id, data_alteracao, usuario_id, valor_antigo, 
+							   valor_novo, campo, tela_alteracao)
+							   values ($acidente_id, getdate(), (select id from usuario where usuario = '$logado'), '$horas_p', 
+							   '$horas', 'Horas ($tipo_despesa_p)', '4-$area_lancamento')";
+					//print $query1;
+					odbc_exec($conSQL, $query1);
+				}
+
+				if ($status_despesa_id_p != $status_despesa_id) {
+					//seleciona a descricao do novo status
+					$query1 = "select descricao
+							   from status_despesa_acidente
+							   where id = $status_despesa_id";
+					//print $query1;
+					$result1 = odbc_exec($conSQL, $query1);
+					$descricao_novo_status = odbc_result($result1, 1);
+
+					//alteracao campo status
+					$query1 = "insert into log_alteracao_acidente (acidente_id, data_alteracao, usuario_id, valor_antigo, 
+							  valor_novo, campo, tela_alteracao)
+							  values ($acidente_id, getdate(), (select id from usuario where usuario = '$logado'), 
+							  '$descricao_status_p', '$descricao_novo_status', 'Status ($tipo_despesa_p)', '4-$area_lancamento')";
+					//print $query1;
+					odbc_exec($conSQL, $query1);
+				}
+
+				if ($data_despesa_formatada != $data_despesa) {
+					//alteracao campo data_despesa
+					$query1 = "insert into log_alteracao_acidente (acidente_id, data_alteracao, usuario_id, valor_antigo, 
+							   valor_novo, campo, tela_alteracao)
+							   values ($acidente_id, getdate(), (select id from usuario where usuario = '$logado'), 
+							   '$data_despesa_formatada', '$data_despesa', 'Data Despesa ($tipo_despesa_p)', 
+							   '4-$area_lancamento')";
+					//print $query1;
+					odbc_exec($conSQL, $query1);
+				}
+
+				if ($observacao_p != $observacao) {
+					//alteracao campo observacao
+					$query1 = "insert into log_alteracao_acidente (acidente_id, data_alteracao, usuario_id, valor_antigo, 
+							   valor_novo, campo, tela_alteracao)
+							   values ($acidente_id, getdate(), (select id from usuario where usuario = '$logado'), 
+							   '$observacao_p', '$observacao', 'Observa&ccedil;&atilde;o ($tipo_despesa_p)', 
+							   '4-$area_lancamento')";
+					//print $query1;
+					odbc_exec($conSQL, $query1);
+				}
+
+				if ($valor_p != $valor) {
+					//alteracao campo valor
+					$query1 = "insert into log_alteracao_acidente (acidente_id, data_alteracao, usuario_id, valor_antigo, 
+							   valor_novo, campo, tela_alteracao)
+							   values ($acidente_id, getdate(), (select id from usuario where usuario = '$logado'), '$valor_p', 
+							   '$valor', 'Valor ($tipo_despesa_p)', '4-$area_lancamento')";
+					//print $query1;
+					odbc_exec($conSQL, $query1);
+				}
+			}
+
+			$cont++;
+		}
+	} //gravar
+
+	if ($pesquisar != "") {
+		if ($status_despesa_id_pesquisa != '')
+			$condicao_status = "and lda.status_despesa_id = '$status_despesa_id_pesquisa'";
+		else
+			$condicao_status = '';
+	}
+
+
+?>
+
+	<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+	<html xmlns="http://www.w3.org/1999/xhtml">
+
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+		<link href="../SCA/includes/estilo.css" rel="stylesheet" type="text/css">
+
+		<script type="text/javascript" src="../SCA/includes/js/jquery-autocomplete/lib/jquery.bgiframe.min.js"></script>
+		<script type="text/javascript" src="../SCA/includes/js/jquery-autocomplete/lib/jquery.ajaxQueue.js"></script>
+		<script type="text/javascript" src="../SCA/includes/js/jquery-autocomplete/lib/thickbox-compressed.js"></script>
+		<script type="text/javascript" src="../SCA/includes/js/jquery-autocomplete/jquery.autocomplete.js"></script>
+
+		<script type="text/javascript" src="_scripts/jquery.click-calendario-1.0-min.js"></script>
+		<script type="text/javascript" src="_scripts/exemplo-calendario.js"></script>
+
+		<link href="_style/jquery.click-calendario-1.0.css" rel="stylesheet" type="text/css" />
+
+		<link rel="stylesheet" type="text/css" href="../SCA/includes/js/jquery-autocomplete/jquery.autocomplete.css" />
+		<link rel="stylesheet" type="text/css" href="../SCA/includes/js/jquery-autocomplete/lib/thickbox.css" />
+
+		<style type="text/css">
+			fieldset {
+				padding: 22px 12px 12px 15px;
+				position: relative;
+				margin: 12px 0 0px 0px;
+			}
+		</style>
+
+		<script type="text/javascript">
+			function completa_nome(elmnt) {
+				//alert();
+				$(elmnt).autocomplete("completar_funcionario.php", {
+					width: 200,
+					selectFirst: true,
+					reverter: false
+				});
+			}
+		</script>
+
+		<script type="text/javascript">
+			function verifica_hora1(elmnt, id, tipo_despesa_id) {
+				//alert();
+				hrs = (elmnt.value.replace(".", "-").substring(0, 2));
+				min = (elmnt.value.replace(".", "-").substring(3, 5));
+
+				//alert('hrs '+ hrs);
+				//alert('min '+ min);
+
+				situacao = "";
+				// verifica data e hora
+				if ((hrs < 00) || (hrs > 23) || (min < 00) || (min > 59)) {
+					situacao = "falsa";
+				} else
+				if (elmnt.value == "") {
+					situacao = "falsa";
+				}
+
+				if (elmnt.value.length < 5) {
+					situacao = "falsa";
+				}
+
+				if (isNaN(hrs) || isNaN(min))
+					situacao = "falsa";
+
+				if (situacao == "falsa") {
+					alert(unescape("Hora inv%E1lida!"));
+					elmnt.value = "";
+					elmnt.select();
+				} else {
+					var funcionario = document.getElementById("funcionario" + id).value;
+
+					//alert(elmnt.value);
+
+					if ((id != "") && (tipo_despesa_id == 3)) {
+						$.ajax({
+							type: "POST", //define o met�do de passagem de parametros
+							url: "includes/busca_valor_funcionario.php", //chama uma pagina
+							data: "id=" + id + "&funcionario=" + funcionario + "&horario=" + elmnt.value, //passa os parametros, se necess�rio
+							success: function(msg) { //pega o retorno da pagina chamada
+								//alert (msg);
+
+								document.getElementById("valor" + id).value = msg;
+
+								//document.form1.submit();
+
+							}
+						});
+					} else
+					if (funcionario == '')
+						document.getElementById("valor" + id).value = '';
+
+				}
+			}
+		</script>
+
+		<script type="text/javascript">
+			function mascara_hora1(elmnt, id, tipo_despesa_id) {
+				var myhora = '';
+				myhora = myhora + elmnt.value;
+				if (myhora.length == 2) {
+					myhora = myhora + ':';
+					elmnt.value = myhora;
+				}
+				if (myhora.length >= 4) {
+					verifica_hora1(elmnt, id, tipo_despesa_id);
+				} else
+				if (myhora.length >= 1) {
+					alert(unescape("Hora inv%E1lida!"));
+					//elmnt.value = "";
+					elmnt.focus();
+				}
+			}
+		</script>
+		<script language="javascript">
+			function copia_despesa(id) {
+				//alert();
+				if (id != "") {
+					//document.form1.submit();
+					$.ajax({
+						type: "POST", //define o met�do de passagem de parametros
+						url: "includes/copia_despesa.php", //chama uma pagina
+						data: "id=" + id, //passa os parametros, se necess�rio
+						success: function(msg) { //pega o retorno da pagina chamada
+							//alert (msg);
+							document.form1.gravar.click();
+
+						}
+					});
+				}
+			}
+		</script>
+
+
+
+	</head>
+
+	<body>
+		<form action="" name="form1" method="post" enctype="multipart/form-data" style="width:1450px">
+			<fieldset>
+				<legend>Lan&ccedil;amentos de Despesas</legend>
+				<table>
+					<tr>
+						<td><b>
+								<font size="-1">Status:</font>
+								<?php
+								$query = "select id, descricao
+							  from status_despesa_acidente";
+								$result = odbc_exec($conSQL, $query);
+
+								print "<select name='status_despesa_id_pesquisa' id='status_despesa_id_pesquisa' class='lista' ><option value=''></option>";
+
+								while (odbc_fetch_array($result)) {
+									if (odbc_result($result, 1) == $status_despesa_id_pesquisa)
+										$selected = "selected='selected'";
+									else
+										$selected = "";
+
+									print "<option value='" . odbc_result($result, 1) . "'$selected>" . odbc_result($result, 2) . "</option>";
+								}
+								print "</select>";
+								?>
+								<input name="pesquisar" type="submit" class="botao_site" value=" Pesquisar " id="pesquisar" />
+
+							</b>
+						</td>
+					</tr>
+				</table>
+
+				<p>&nbsp;</p>
+				<p>
+					<?php
+
+					if ($area_rh == 'S') {
+
+						$query = "select lda.lancamento_id, tda.tipo_despesa, lda.funcionario, lda.horas, lda.status_despesa_id, 
+					CONVERT(varchar(10), lda.data_despesa, 103), lda.observacao, replace(lda.valor,'.',','), CONVERT(varchar(10), lda.prazo, 103), 
+					CONVERT(varchar(10), lda.data_inclusao, 103)+' - '+CONVERT(varchar(10), lda.data_inclusao, 108)
+					,tda.referencia_despesa_id
+					, area.area
+					, rd.descricao
+					, tda.base					
+					from lancamento_despesas_acidente lda with (nolock)
+					join tipo_despesa_acidente tda with (nolock) on
+						tda.id = lda.tipo_despesa_id
+						and tda.referencia_despesa_id = 3
+					join area_responsavel_acidente area with (nolock) on
+						area.id = lda.area_id
+					join referencia_despesa rd with (nolock) on
+						rd.id = tda.referencia_despesa_id							
+					where lda.status_id <> 'i'
+					$condicao_status
+					and lda.acidente_id = $acidente_id
+					
+					union
+					
+					select lda.lancamento_id, tda.tipo_despesa, lda.funcionario, lda.horas, lda.status_despesa_id, 
+					CONVERT(varchar(10), lda.data_despesa, 103), lda.observacao, replace(lda.valor,'.',','), CONVERT(varchar(10), lda.prazo, 103), 
+					CONVERT(varchar(10), lda.data_inclusao, 103)+' - '+CONVERT(varchar(10), lda.data_inclusao, 108)
+					,tda.referencia_despesa_id
+					, area.area
+					, rd.descricao
+					, tda.base	
+					, replace(lda.valor_abatido,'.',',')				
+					from lancamento_despesas_acidente lda with (nolock)
+					join tipo_despesa_acidente tda with (nolock) on
+						tda.id = lda.tipo_despesa_id
+						and tda.referencia_despesa_id not in (3)
+					join area_responsavel_acidente area with (nolock) on
+						area.id = lda.area_id
+					join referencia_despesa rd with (nolock) on
+						rd.id = tda.referencia_despesa_id							
+					where lda.area_id = '5' -- codigo RH
+					and lda.status_id <> 'i'
+					$condicao_status
+					and lda.acidente_id = $acidente_id
+					
+					order by area.area, tda.tipo_despesa, lda.lancamento_id";
+						//print $query;
+						$result = odbc_exec($conSQL, $query) or die('Erro ao consultar com permissao de RH');
+
+
+						print "<table width='1400' border='1' >
+		  <tr>
+			<td bgcolor='#CCCCCC'><div align='center'><strong><font size='-2'>TIPO DE DESPESA</font></strong></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><strong><font size='-2'>REFER&Ecirc;NCIA</font></strong></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><strong><font size='-2'>BASE</font></strong></div></td>						
+			<td bgcolor='#CCCCCC'><div align='center'><strong><font size='-2'>&Aacute;REA</font></strong></div></td>			
+			<td bgcolor='#CCCCCC'>
+				<div align='center'><p align='center'><strong><font size='-2'>FUNCION&Aacute;RIO</font></strong></p></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><strong><font size='-2'>HORAS</font></strong></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>STATUS</font></strong></p></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>DATA CE&Eacute;DITO</font></strong></p></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>OBSERVA&Ccedil;&Atilde;O</font></strong></p></div></td>										
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>VALOR D&Eacute;BITO</font></strong></p></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>VALOR CR&Eacute;DITO</font></strong></p></div></td>																		
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>PRAZO</font></strong></p></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>ANEXO</font></strong></p></div></td>					
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>DATA INCLUS&Atilde;O</font></strong></p></div></td>																									
+			<td width='60' bgcolor='#CCCCCC'><div align='center'><p align='center'><font color='black' size='-2'><b>ADD</b></font></p></div></td>
+		  </tr>";
+
+
+						while (odbc_fetch_row($result)) {
+							$id 					= odbc_result($result, 1);
+							$tipo_despesa 		= odbc_result($result, 2);
+
+							if ($atualizar != '') {
+								$funcionario			= $_POST["funcionario$id"];
+								$horas		 		= $_POST["horas$id"];
+								$status_despesa_id	= $_POST["status_despesa_id$id"];
+								$data_despesa		= $_POST["data_despesa$id"];
+								$observacao			= $_POST["observacao$id"];
+								$valor				= $_POST["valor$id"];
+								$valor_abatido				= $_POST["valor_abatido$id"];
+							} else {
+								$funcionario			= odbc_result($result, 3);
+								$horas		 		= odbc_result($result, 4);
+								$status_despesa_id	= odbc_result($result, 5);
+								$data_despesa		= odbc_result($result, 6);
+								$observacao			= odbc_result($result, 7);
+								$valor				= odbc_result($result, 8);
+								$valor_abatido				= odbc_result($result, 15);
+							}
+							$prazo				= odbc_result($result, 9);
+							$data_inclusao		= odbc_result($result, 10);
+							$tipo_referencia_id	= odbc_result($result, 11);
+							$descricao_area		= odbc_result($result, 12);
+							$referencia			= odbc_result($result, 13);
+							$base				= odbc_result($result, 14);
+
+
+							if (($funcionario == '') && ($tipo_referencia_id == 3))
+								$valor = '';
+
+							$observacao = utf8_encode($observacao);
+
+
+							$lista_status_despesa = str_replace("selected = 'selected'", "", $lista_status_despesa);
+							$lista_status_despesa =
+								str_replace("value='$status_despesa_id'", "value='$status_despesa_id' selected = 'selected'", $lista_status_despesa);
+
+							$valor_soma =  str_replace(',', '.', $valor);
+
+
+							print "<tr>
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $tipo_despesa . "</center></b></td>
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $referencia . "</center></b></td>
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $base . "</center></b></td>					 					 
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $descricao_area . "</center></b></td>					 
+					 <td bgcolor='#FFFFFF'><center>
+						<input name='funcionario$id' type='text' id='funcionario$id' value='$funcionario' size='40' 
+						onfocus='javascript:completa_nome(this)'/></td>
+					 <td bgcolor='#FFFFFF'><center><input name='horas$id' type='text' id='horas$id' value='$horas' size='2' maxlength='5' 
+					 onKeyPress='valida_horas(this)' onblur='javascript:mascara_hora1(this, $id, $tipo_referencia_id)' /></td>
+					 <td bgcolor='#FFFFFF'><center>
+						<select name='status_despesa_id$id' id='status_despesa_id$id' class='linha$id' >
+							$lista_status_despesa
+						</select>					
+					  </td>			
+					 <td bgcolor='#FFFFFF'><center>
+						<input name='data_despesa$id' type='text' id='data_despesa$id' value='$data_despesa' size='7' maxlength='10' 
+						onblur='verifica_data_1(this)'/></td>								
+					 <td bgcolor='#FFFFFF'><center>
+						<input name='observacao$id' type='text' id='observacao$id' value='$observacao' size='35' maxlength='200' /></td>
+					 <td bgcolor='#FFFFFF'><center><input name='valor$id' type='text' id='valor$id' value='$valor' size='7' 
+					 onKeyPress='valida_dinheiro(this)'/></td>
+					 <td bgcolor='#FFFFFF'><center><input name='valor_abatido$id' type='text' id='valor_abatido$id' value='$valor_abatido' size='7' 
+					 onKeyPress='valida_dinheiro(this)'/></td>
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $prazo . "</center></b></td>
+					 <td bgcolor='#FFFFFF'><a href=javascript:pagina('upload_despesa.php?id=$id&acidente_id=$acidente_id','1200','400','Anexos')>
+						<div align='center'><img src='../SCA/images/anexo.png' width='15' heigth='10' style='border:none'/></div></a></td>
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $data_inclusao . "</center></b></td>";
+
+							if (($status_acidente == 'p') || ($status_acidente == 'r'))
+								print "<td bgcolor='#FFFFFF'><div align='center'><a href='javascript:copia_despesa($id);'>
+								<img src='../SCA/images/adicionar.png' width='20' heigth='20' style='border:none'/></div></td>";
+							else
+								print "<td bgcolor='#FFFFFF'>
+								<div align='center'><img src='../SCA/images/adicionar.png' width='20' heigth='20' style='border:none'/></div></td>";
+							print "</tr>";
+
+							$total_lancamento = $total_lancamento + $valor_soma;
+						}
+						print "</table>";
+					} else {
+
+						$query = "select lda.lancamento_id, tda.tipo_despesa collate sql_latin1_general_cp1251_ci_as, lda.funcionario, lda.horas, 
+					lda.status_despesa_id, 
+					CONVERT(varchar(10), lda.data_despesa, 103), lda.observacao, replace(lda.valor,'.',','), 
+					CONVERT(varchar(10), lda.prazo, 103), 
+					CONVERT(varchar(10), lda.data_inclusao, 103)+' - '+CONVERT(varchar(10), lda.data_inclusao, 108)
+					,tda.referencia_despesa_id
+					, rd.descricao
+					, tda.base		
+					, ara.area	
+					, replace(lda.valor_abatido,'.',',')		
+					from lancamento_despesas_acidente lda with (nolock)
+					join tipo_despesa_acidente tda with (nolock) on
+						tda.id = lda.tipo_despesa_id
+					join referencia_despesa rd with (nolock) on
+						rd.id = tda.referencia_despesa_id	
+					join area_responsavel_acidente ara with (nolock) on
+						ara.id = lda.AREA_ID												
+					where lda.area_id in ($area_id)
+					and lda.status_id <> 'i'
+					$condicao_status
+					and lda.acidente_id = $acidente_id
+					
+					order by ara.area, tda.tipo_despesa, lda.lancamento_id";
+						//print $query;
+						$result = odbc_exec($conSQL, $query);
+
+
+						print "<table width='1400' border='1' >
+		  <tr>
+			<td bgcolor='#CCCCCC'><div align='center'><strong><font size='-2'>AREA</font></strong></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><strong><font size='-2'>TIPO DE DESPESA</font></strong></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><strong><font size='-2'>REFER&Ecirc;NCIA</font></strong></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><strong><font size='-2'>BASE</font></strong></div></td>				
+			<td bgcolor='#CCCCCC'>
+				<div align='center'><p align='center'><strong><font size='-2'>FUNCION&Aacute;RIO</font></strong></p></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><strong><font size='-2'>HORAS</font></strong></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>STATUS</font></strong></p></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>DATA CR&Eacute;DITO</font></strong></p></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>OBSERVA&Ccedil;&Atilde;O</font></strong></p></div></td>										
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>VALOR D&Eacute;BITO</font></strong></p></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>VALOR CR&Eacute;DITO</font></strong></p></div></td>															
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>PRAZO</font></strong></p></div></td>
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>ANEXO</font></strong></p></div></td>					
+			<td bgcolor='#CCCCCC'><div align='center'><p align='center'><strong><font size='-2'>DATA INCLUS&Atilde;O</font></strong></p></div></td>																									
+			<td width='60' bgcolor='#CCCCCC'><div align='center'><p align='center'><font color='black' size='-2'><b>ADD</b></font></p></div></td>
+		  </tr>";
+
+
+						while (odbc_fetch_row($result)) {
+							$id 					= odbc_result($result, 1);
+							$tipo_despesa 		= odbc_result($result, 2);
+
+							if ($atualizar != '') {
+								$funcionario			= $_POST["funcionario$id"];
+								$horas		 		= $_POST["horas$id"];
+								$status_despesa_id	= $_POST["status_despesa_id$id"];
+								$data_despesa		= $_POST["data_despesa$id"];
+								$observacao			= $_POST["observacao$id"];
+								$valor				= $_POST["valor$id"];
+								$valor_abatido				= $_POST["valor_abatido$id"];
+							} else {
+								$funcionario			= odbc_result($result, 3);
+								$horas		 		= odbc_result($result, 4);
+								$status_despesa_id	= odbc_result($result, 5);
+								$data_despesa		= odbc_result($result, 6);
+								$observacao			= odbc_result($result, 7);
+								$valor				= odbc_result($result, 8);
+								$valor_abatido				= odbc_result($result, 15);
+							}
+							$prazo				= odbc_result($result, 9);
+							$data_inclusao		= odbc_result($result, 10);
+							$tipo_referencia_id	= odbc_result($result, 11);
+							$referencia			= odbc_result($result, 12);
+							$base				= odbc_result($result, 13);
+							$descricao_area		= odbc_result($result, 14);
+
+							$observacao = utf8_encode($observacao);
+
+							$lista_status_despesa = str_replace("selected = 'selected'", "", $lista_status_despesa);
+							$lista_status_despesa =
+								str_replace("value='$status_despesa_id'", "value='$status_despesa_id' selected = 'selected'", $lista_status_despesa);
+
+							$valor_soma =  str_replace(',', '.', $valor);
+
+
+							print "<tr>
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $descricao_area . "</center></b></td>
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $tipo_despesa . "</center></b></td>
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $referencia . "</center></b></td>
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $base . "</center></b></td>	
+					 <td bgcolor='#FFFFFF'><center>
+						<input name='funcionario$id' type='text' id='funcionario$id' value='$funcionario' size='40' 
+						onfocus='javascript:completa_nome(this)'/></td>";
+
+						/*if (($tipo_referencia_id == 3) && ($area_qualidade == 'S') && ($permissao_campo == 'N'))
+							print "<td bgcolor='#FFFFFF'><center><input name='horas$id' type='hidden' id='horas$id' value='$horas' size='2' maxlength='5' 
+							onKeyPress='valida_horas(this)' onblur='javascript:mascara_hora1(this, $id, $tipo_referencia_id)' /><font size='-2'>*****
+							</font></td>";
+						else*/
+
+						print "<td bgcolor='#FFFFFF'><center><input name='horas$id' type='text' id='horas$id' value='$horas' size='2' maxlength='5' 
+						onKeyPress='valida_horas(this)' onblur='javascript:mascara_hora1(this, $id, $tipo_referencia_id)' /></td>";
+
+							print "
+					 <td bgcolor='#FFFFFF'><center>
+						<select name='status_despesa_id$id' id='status_despesa_id$id' class='linha$id' >
+							$lista_status_despesa
+						</select>					
+					  </td>			
+					 <td bgcolor='#FFFFFF'><center>
+						<input name='data_despesa$id' type='text' id='data_despesa$id' value='$data_despesa' size='7' maxlength='10' 
+						onblur='verifica_data_1(this)'/></td>								
+					 <td bgcolor='#FFFFFF'><center>
+						<input name='observacao$id' type='text' id='observacao$id' value='$observacao' size='35' maxlength='200' /></td>";
+
+							if ($tipo_referencia_id == 3) {
+								print "<td bgcolor='#FFFFFF'><center><input name='valor$id' type='hidden' id='valor$id' value='$valor' size='7'
+								 onKeyPress='valida_dinheiro(this)'/><font size='-2'>******</font></td>";
+								print "<td bgcolor='#FFFFFF'><center><input name='valor_abatido$id' type='hidden' id='valor_abatido$id' value='$valor_abatido' size='7'
+								 onKeyPress='valida_dinheiro(this)'/><font size='-2'>******</font></td>";
+							} else {
+								print "<td bgcolor='#FFFFFF'><center><input name='valor$id' type='text' id='valor$id' value='$valor' size='7' 
+								 onKeyPress='valida_dinheiro(this)'/></td>";
+								print "<td bgcolor='#FFFFFF'><center><input name='valor_abatido$id' type='text' id='valor_abatido$id' value='$valor_abatido' size='7' 
+								 onKeyPress='valida_dinheiro(this)'/></td>";
+							}
+
+							print "
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $prazo . "</center></b></td>
+					 <td bgcolor='#FFFFFF'><a href=javascript:pagina('upload_despesa.php?id=$id&acidente_id=$acidente_id','1200','400','Anexos')>
+						<div align='center'><img src='../SCA/images/anexo.png' width='15' heigth='10' style='border:none'/></div></a></td>
+					 <td bgcolor='#FFFFFF'><center><font size='-2'>" . $data_inclusao . "</center></b></td>";
+
+							if (($status_acidente == 'p') || ($status_acidente == 'r'))
+								print "<td bgcolor='#FFFFFF'><div align='center'><a href='javascript:copia_despesa($id);'>
+								<img src='../SCA/images/adicionar.png' width='20' heigth='20' style='border:none'/></div></td>";
+							else
+								print "<td bgcolor='#FFFFFF'>
+								<div align='center'><img src='../SCA/images/adicionar.png' width='20' heigth='20' style='border:none'/></div></td>";
+							print "</tr>";
+
+							$total_lancamento = $total_lancamento + $valor_soma;
+						}
+						print "</table>";
+					}
+
+					?>
+				</p>
+
+
+
+				<p>&nbsp;</p>
+				<table width="322" border="1">
+					<tr>
+						<td width="169" height="22">
+							<a href=javascript:pagina('logs_alteracao.php?acidente_id=<?php print $acidente_id ?>&tela=<?php print '4-' . $area_id ?>','1300','400','Logs1')><b>
+									<center>Logs de Altera&ccedil;&atilde;o</center>
+								</b></a>
+						</td>
+						<td width="169" height="22">
+							<a href=javascript:pagina('lancamento_despesa_avulsa.php?acidente_id=<?php print $acidente_id ?>&area_id=<?php print $area_id ?>','1300','800','Avulsas')><b>
+									<center>
+										Despesas Avulsas
+									</center>
+								</b></a>
+						</td>
+					</tr>
+				</table>
+
+				<p>&nbsp;</p>
+				<p></p>
+				<table width="1192" border="1" frame="box" rules="none">
+					<tr>
+						<td width="155" bgcolor="#FFFFFF">
+							<div align="center">
+								<font size="-1"><b>Total lan&ccedil;amento:</b></font>
+							</div>
+						</td>
+						<td bgcolor="#FFFFFF">
+							<div align="right">
+								<font size="-1"><b>R$ <?php print number_format($total_lancamento, 2, ',', '.'); ?></b></font>
+							</div>
+						</td>
+					</tr>
+				</table>
+				</td>
+				<p></p>
+				<p></p>
+				<br />
+
+
+				<p>&nbsp;</p>
+				<table width="1400" border="0" align="center">
+					<tr>
+						<td width="1115" class="txt_home">
+							<div align="center">
+								<input name="gravar" type="submit" class="botao_site" value=" Gravar " id="gravar" />
+								<input name="fechar" type="submit" class="botao_site" value=" Fechar " id="fechar" />
+							</div>
+						</td>
+						<td width="75" class="txt_home">
+							<?php
+
+							if ($botao_voltar == 1) {
+								print "
+      	<a href='registro_acidente_parte1.php?id=$acidente_id'><img src='../SCA/images/botao_voltar.png' alt='Retorna para a p&aacute;gina principal' width='77' height='28' border='0'/></a>";
+							}
+							?>
+
+						</td>
+					</tr>
+					<tr>
+						<td colspan="2" class="txt_home">&nbsp;</td>
+					</tr>
+				</table>
+			</fieldset>
+		</form>
+
+		<p>&nbsp;</p>
+	</body>
+<?php
+
+	if (($status_acidente != 'p') && ($status_acidente != 'r'))
+		print "<script language='javascript'>desabilita_botao('gravar')</script>";
+}
+?>
+
+	</html>

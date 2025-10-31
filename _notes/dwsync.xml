@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<dwsync>
+<file name="cadastro_areas_responsaveis.php" server="192.168.10.148" local="130905060991061296" remote="130905132600000000" Dst="-1" />
+<file name="completar_usuario.php" server="192.168.10.148" local="130849747283624591" remote="130849855800000000" Dst="-1" />
+<file name="tipo_despesa.php" server="192.168.10.148" local="130936137269221873" remote="130936209000000000" Dst="0" />
+<file name="tipo_acidente.php" server="192.168.10.148" local="130936999405766294" remote="130937071200000000" Dst="0" />
+<file name="acidente_tipo_despesa.php" server="192.168.10.148" local="130936138606713145" remote="130936210200000000" Dst="0" />
+<file name="registro_acidente_parte1.php" server="192.168.10.148" local="130937259897747187" remote="130937331600000000" Dst="0" />
+<file name="completar_funcionario.php" server="192.168.10.148" local="130937035047059319" remote="130937106600000000" Dst="0" />
+<file name="completar_veiculo.php" server="192.168.10.148" local="130856722835700649" remote="130856830800000000" Dst="-1" />
+<file name="completar_municipio.php" server="192.168.10.148" local="130856758179621584" remote="130856865600000000" Dst="-1" />
+<file name="upload.php" server="192.168.10.148" local="130888721375541612" remote="130888828800000000" Dst="-1" />
+<file name="pesquisa_acidente.php" server="192.168.10.148" local="130936123839323396" remote="130936195800000000" Dst="0" />
+<file name="completar_cliente.php" server="192.168.10.148" local="130858432425713923" remote="130858540200000000" Dst="-1" />
+<file name="logs_alteracao.php" server="192.168.10.148" local="130906788772864979" remote="130906860600000000" Dst="-1" />
+<file name="permissoes_acidente.php" server="192.168.10.148" local="130893906316915054" remote="130894014000000000" Dst="-1" />
+<file name="lista_usuarios.php" server="192.168.10.148" local="130937170565387640" remote="130937242200000000" Dst="0" />
+<file name="registro_acidente_parte2.php" server="192.168.10.148" local="130937058876141088" remote="130937130600000000" Dst="0" />
+<file name="registro_acidente_parte3.php" server="192.168.10.148" local="130937243287158684" remote="130937314800000000" Dst="0" />
+<file name="lancamento_despesas.php" server="192.168.10.148" local="130937016744005926" remote="130937088600000000" Dst="0" />
+<file name="upload_despesa.php" server="192.168.10.148" local="130888721515416662" remote="130888829400000000" Dst="-1" />
+<file name="leitura_email.php" server="192.168.10.148" local="130893887818994727" remote="130893995400000000" Dst="-1" />
+<file name="emails_automaticos.php" server="192.168.10.148" local="130937023046322056" remote="130937094600000000" Dst="0" />
+<file name="leitura_macro.php" server="192.168.10.148" local="130893836710425593" remote="130893944400000000" Dst="-1" />
+<file name="cadastro_referencia.php" server="192.168.10.148" local="130898955026036895" remote="130899027000000000" Dst="-1" />
+<file name="relatorio_acidente.php" server="192.168.10.148" local="130937244777978018" remote="130937316600000000" Dst="0" />
+</dwsync>

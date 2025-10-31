@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<dwsync>
+<file name="busca_usuario_id.php" server="192.168.10.192" local="130849812627111722" remote="130849920600000000" Dst="0" />
+<file name="busca_dados.php" server="192.168.10.192" local="130849805569793088" remote="130849913400000000" Dst="0" />
+<file name="busca_dados_tipo.php" server="192.168.10.192" local="130850608925315224" remote="130850716800000000" Dst="0" />
+<file name="exclui_tipo_despesa.php" server="192.168.10.192" local="130850633518912796" remote="130850741400000000" Dst="0" />
+<file name="exclui_area.php" server="192.168.10.192" local="130850645536774796" remote="130850753400000000" Dst="0" />
+<file name="exclui_tipo_acidente.php" server="192.168.10.192" local="130850667984490882" remote="130850775600000000" Dst="0" />
+<file name="busca_dados_tipo_acidente.php" server="192.168.10.192" local="130850668636961946" remote="130850776200000000" Dst="0" />
+<file name="insere_despesa.php" server="192.168.10.192" local="130919069683314720" remote="130919141400000000" Dst="0" />
+<file name="busca_pessoa_id.php" server="192.168.10.192" local="130856717353440448" remote="130856824800000000" Dst="0" />
+<file name="insere_funcionario.php" server="192.168.10.192" local="130937037471154001" remote="130937109000000000" Dst="0" />
+<file name="exclui_envolvido.php" server="192.168.10.192" local="130868166827225795" remote="130868274600000000" Dst="0" />
+<file name="busca_veiculo_id.php" server="192.168.10.192" local="130856717580585422" remote="130856825400000000" Dst="0" />
+<file name="insere_placa.php" server="192.168.10.192" local="130868048272808343" remote="130868155800000000" Dst="0" />
+<file name="exclui_placa.php" server="192.168.10.192" local="130868108624109075" remote="130868216400000000" Dst="0" />
+<file name="exclui_arquivo.php" server="192.168.10.192" local="130873133225438594" remote="130873240800000000" Dst="0" />
+<file name="exclui_acidente.php" server="192.168.10.192" local="130861940801025174" remote="130862048400000000" Dst="0" />
+<file name="busca_responsavel_id.php" server="192.168.10.192" local="130862744311310630" remote="130862851800000000" Dst="0" />
+<file name="busca_usuario_cadastrado.php" server="192.168.10.192" local="130862792664604701" remote="130862900400000000" Dst="0" />
+<file name="insere_ferido_ppae.php" server="192.168.10.192" local="130937043391800182" remote="130937115000000000" Dst="0" />
+<file name="exclui_ferido_ppae.php" server="192.168.10.192" local="130868156325796082" remote="130868263800000000" Dst="0" />
+<file name="altera_ferido.php" server="192.168.10.192" local="130868179937275496" remote="130868287800000000" Dst="0" />
+<file name="insere_area_acidente.php" server="192.168.10.192" local="130937016839016052" remote="130937088600000000" Dst="0" />
+<file name="exclui_despesa_area.php" server="192.168.10.192" local="130936971633571146" remote="130937043600000000" Dst="0" />
+<file name="copia_despesa.php" server="192.168.10.192" local="130936210661135556" remote="130936282200000000" Dst="0" />
+<file name="exclui_arquivo_lancamento.php" server="192.168.10.192" local="130873145757288438" remote="130873253400000000" Dst="0" />
+<file name="insere_cc_acidente.php" server="192.168.10.192" local="130875687237249618" remote="130875795000000000" Dst="0" />
+<file name="exclui_despesa_cc.php" server="192.168.10.192" local="130875686178311759" remote="130875793800000000" Dst="0" />
+<file name="conclui_ppae.php" server="192.168.10.192" local="130888713096907611" remote="130888821000000000" Dst="0" />
+<file name="reabre_ppae.php" server="192.168.10.192" local="130888713457569168" remote="130888821000000000" Dst="0" />
+<file name="concluir.php" server="192.168.10.192" local="130885195120081556" remote="130885302600000000" Dst="0" />
+<file name="reabrir.php" server="192.168.10.192" local="130885249702159461" remote="130885357200000000" Dst="0" />
+<file name="busca_referencia.php" server="192.168.10.192" local="130898114636817115" remote="130898186400000000" Dst="0" />
+<file name="valida_municipio.php" server="192.168.10.192" local="130906824856167350" remote="130906896600000000" Dst="0" />
+<file name="grava_qualidade.php" server="192.168.10.192" local="130937215976921413" remote="130937287800000000" Dst="0" />
+</dwsync>
